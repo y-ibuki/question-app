@@ -1,14 +1,18 @@
 import { useRouter } from 'next/router'
-import { useEffect, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { User } from '../../models/User'
 import firebase from 'firebase/app'
+import Layout from '../../components/Layout'
+import { toast } from 'react-toastify';
 
 type Query = {
     uid: string
 }
 
 export default function UserShow() {
+    const [body, setBody] = useState('')
     const [user, setUser] = useState<User>(null)
+    const [isSending, setIsSending] = useState(false)
     const router = useRouter()
     const query = router.query as Query
 
@@ -31,29 +35,65 @@ export default function UserShow() {
         loadUser()
     }, [query.uid])
 
+    async function onSubmit(e: FormEvent<HTMLFormElement>) {
+        e.preventDefault()
+        setIsSending(true)
+
+        await firebase.firestore().collection('questions').add({
+            senderUid: firebase.auth().currentUser.uid,
+            receiverUid: user.uid,
+            body,
+            isReplied: false,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        })
+
+        setIsSending(false)
+
+        setBody('')
+        toast.success('質問を送信しました。', {
+            position: 'bottom-left',
+            autoClose: 5000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+            progress: undefined,
+        })
+    }
+
     return (
-        <div>
-            <nav
-                className="navbar navbar-expand-lg navbar-light mb-3"
-                style={{ backgroundColor: '#e3f2fd' }}
-            >
-                <div className="container">
-                    <div className="mr-auto">
-                        <a className="navbar-brand" href="#">
-                            Navbar
-                        </a>
-                    </div>
-                    <form className="d-flex">
-                        <button className="btn btn-outline-primary" type="submit">
-                            Search
-                        </button>
+        <Layout>
+            {user && (
+                <div className="text-center">
+                    <h1 className="h4">{user.name}さんのページ</h1>
+                    <div className="m-5">{user.name}さんに質問しよう！</div>
+                </div>
+            )}
+            <div className="row justify-content-center mb-3">
+                <div className="col-12 col-md-6">
+                    <form onSubmit={onSubmit}>
+                        <textarea
+                            className="form-control"
+                            placeholder="おげんきですか？"
+                            rows={6}
+                            value={body}
+                            onChange={(e) => setBody(e.target.value)}
+                            required
+                        ></textarea>
+                        <div className="m-3">
+                            {isSending ? (
+                                <div className="spinner-border text-secondary" role="status">
+                                    <span className="visually-hidden">Loading...</span>
+                                </div>
+                            ) : (
+                                <button type="submit" className="btn btn-primary">
+                                    質問を送信する
+                                </button>
+                            )}
+                        </div>
                     </form>
                 </div>
-            </nav>
-            <div className="container">
-                <div>{user ? user.name : 'ロード中…'}</div>
-                <button className="btn btn-primary">ボタン</button>
             </div>
-        </div>
+        </Layout>
     )
 }
